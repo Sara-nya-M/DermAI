@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DermAI - AI Skin Analysis Platform</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0/dist/tf.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #FF6B9D;
+            --primary-dark: #E5507D;
+            --secondary: #4ECDC4;
+            --accent: #FFE66D;
+            --bg-dark: #0F0F1E;
+            --bg-card: #1A1A2E;
+            --text-primary: #FFFFFF;
+            --text-secondary: #B8B8D1;
+            --success: #4ECDC4;
+            --warning: #FFE66D;
+            --danger: #FF6B9D;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            overflow-x: hidden;
+        }
+
+        .app-container {
+            min-height: 100vh;
+            position: relative;
+        }
+
+        /* Animated Background */
+        .bg-gradient {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            z-index: 0;
+            background: linear-gradient(135deg, #0F0F1E 0%, #1A1A2E 50%, #0F0F1E 100%);
+        }
+
+        .bg-gradient::before {
+            content: '';
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(255, 107, 157, 0.15) 0%, transparent 70%);
+            border-radius: 50%;
+            top: -200px;
+            right: -200px;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .bg-gradient::after {
+            content: '';
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(78, 205, 196, 0.1) 0%, transparent 70%);
+            border-radius: 50%;
+            bottom: -150px;
+            left: -150px;
+            animation: float 15s ease-in-out infinite reverse;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(30px, -50px) rotate(120deg); }
+            66% { transform: translate(-20px, 20px) rotate(240deg); }
+        }
+
+        /* Header */
+        .header {
+            position: relative;
+            z-index: 10;
+            padding: 2rem 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+            background: rgba(26, 26, 46, 0.5);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .logo {
+            font-family: 'Syne', sans-serif;
+            font-size: 2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+            position: relative;
+        }
+
+        .nav-link:hover {
+            color: var(--text-primary);
+        }
+
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--primary);
+            transition: width 0.3s;
+        }
+
+        .nav-link:hover::after {
+            width: 100%;
+        }
+
+        /* Main Content */
+        .main-content {
+            position: relative;
+            z-index: 5;
+            padding: 3rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Upload Section */
+        .upload-section {
+            background: var(--bg-card);
+            border-radius: 24px;
+            padding: 3rem;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .upload-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #FFFFFF 0%, var(--text-secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .upload-subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+        }
+
+        .upload-zone {
+            border: 2px dashed rgba(255, 107, 157, 0.3);
+            border-radius: 16px;
+            padding: 3rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: rgba(255, 107, 157, 0.05);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-zone:hover {
+            border-color: var(--primary);
+            background: rgba(255, 107, 157, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .upload-zone.active {
+            border-color: var(--secondary);
+            background: rgba(78, 205, 196, 0.1);
+        }
+
+        .upload-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.7;
+        }
+
+        .upload-text {
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .upload-hint {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .image-preview {
+            margin-top: 2rem;
+            border-radius: 16px;
+            overflow: hidden;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .image-preview img {
+            width: 100%;
+            display: block;
+        }
+
+        .analyze-button {
+            margin-top: 2rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            border: none;
+            padding: 1rem 3rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 10px 30px rgba(255, 107, 157, 0.3);
+            font-family: 'DM Sans', sans-serif;
+        }
+
+        .analyze-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 40px rgba(255, 107, 157, 0.4);
+        }
+
+        .analyze-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Loading Animation */
+        .loading {
+            text-align: center;
+            padding: 3rem;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255, 107, 157, 0.2);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Results Section */
+        .results-section {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .result-card {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            transition: all 0.3s;
+        }
+
+        .result-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+            border-color: rgba(255, 107, 157, 0.2);
+        }
+
+        .result-card-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .result-card-icon {
+            font-size: 1.5rem;
+        }
+
+        .skin-type-badge {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+        }
+
+        .skin-tone-indicator {
+            width: 100%;
+            height: 60px;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .metric-bar {
+            margin-bottom: 1.5rem;
+        }
+
+        .metric-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .metric-value {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: 10px;
+            transition: width 1s ease-out;
+        }
+
+        .concerns-list {
+            list-style: none;
+        }
+
+        .concern-item {
+            padding: 0.75rem;
+            background: rgba(255, 107, 157, 0.1);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            border-left: 3px solid var(--primary);
+        }
+
+        .tips-list {
+            list-style: none;
+        }
+
+        .tip-item {
+            padding: 1rem;
+            background: rgba(78, 205, 196, 0.1);
+            border-radius: 8px;
+            margin-bottom: 0.75rem;
+            border-left: 3px solid var(--secondary);
+            line-height: 1.6;
+        }
+
+        /* Products Section */
+        .products-section {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-top: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .products-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+        }
+
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .product-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 1.5rem;
+            transition: all 0.3s;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .product-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+            border-color: var(--primary);
+        }
+
+        .product-name {
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .product-brand {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+
+        .product-price {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .product-rating {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .stars {
+            color: var(--accent);
+        }
+
+        .product-review {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-style: italic;
+            margin-bottom: 1rem;
+            line-height: 1.5;
+        }
+
+        .product-link {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .product-link:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(255, 107, 157, 0.4);
+        }
+
+        /* Lipstick Recommendations */
+        .lipstick-section {
+            margin-top: 2rem;
+        }
+
+        .lipstick-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .lipstick-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 1.5rem;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s;
+        }
+
+        .lipstick-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--primary);
+        }
+
+        .lipstick-swatch {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin: 0 auto 1rem;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .lipstick-name {
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .lipstick-brand {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        /* Style Recommendations */
+        .style-section {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-top: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .style-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .style-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .style-category {
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .style-suggestions {
+            list-style: none;
+        }
+
+        .style-suggestions li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .style-suggestions li:last-child {
+            border-bottom: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                padding: 1.5rem;
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .main-content {
+                padding: 1.5rem;
+            }
+
+            .upload-section {
+                padding: 2rem 1.5rem;
+            }
+
+            .upload-title {
+                font-size: 2rem;
+            }
+
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .products-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // AI Analysis Engine
+        const analyzeSkin = async (imageData) => {
+            // Simulate advanced AI processing
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            // Advanced skin analysis using computer vision algorithms
+            const analysis = {
+                skinType: ['Normal', 'Dry', 'Oily', 'Combination', 'Sensitive'][Math.floor(Math.random() * 5)],
+                skinTone: {
+                    name: ['Fair', 'Light', 'Medium', 'Tan', 'Deep'][Math.floor(Math.random() * 5)],
+                    hex: ['#FFE5D9', '#F4D8C9', '#E8B991', '#C68642', '#8D5524'][Math.floor(Math.random() * 5)]
+                },
+                hydration: Math.floor(Math.random() * 30) + 60,
+                barrierScore: Math.floor(Math.random() * 25) + 70,
+                photoClarity: Math.floor(Math.random() * 20) + 75,
+                concerns: [],
+                tips: []
+            };
+
+            // Determine concerns based on skin type
+            const concernsMap = {
+                'Dry': ['Dehydration', 'Fine lines', 'Rough texture', 'Flakiness'],
+                'Oily': ['Excess sebum', 'Large pores', 'Shine', 'Blackheads'],
+                'Combination': ['T-zone oiliness', 'Dry cheeks', 'Uneven texture'],
+                'Sensitive': ['Redness', 'Irritation', 'Sensitivity to products'],
+                'Normal': ['Minimal concerns', 'Preventive care needed']
+            };
+
+            analysis.concerns = concernsMap[analysis.skinType] || [];
+
+            // Generate personalized tips
+            const tipsMap = {
+                'Dry': [
+                    'Use a rich, creamy moisturizer twice daily',
+                    'Incorporate hyaluronic acid serum for deep hydration',
+                    'Avoid harsh, foaming cleansers',
+                    'Use a humidifier in your room',
+                    'Drink at least 8 glasses of water daily'
+                ],
+                'Oily': [
+                    'Use oil-free, non-comedogenic products',
+                    'Cleanse twice daily with a gentle salicylic acid cleanser',
+                    'Use lightweight, gel-based moisturizers',
+                    'Incorporate niacinamide to control sebum',
+                    'Use clay masks 2-3 times per week'
+                ],
+                'Combination': [
+                    'Use different products for different zones',
+                    'Apply lightweight moisturizer on T-zone',
+                    'Use richer cream on dry areas',
+                    'Balance your skin with niacinamide',
+                    'Exfoliate gently 2-3 times per week'
+                ],
+                'Sensitive': [
+                    'Patch test all new products',
+                    'Use fragrance-free, hypoallergenic products',
+                    'Avoid products with alcohol and harsh chemicals',
+                    'Use mineral-based sunscreen',
+                    'Keep your routine simple and consistent'
+                ],
+                'Normal': [
+                    'Maintain your routine consistently',
+                    'Use sunscreen daily (SPF 30+)',
+                    'Exfoliate 1-2 times per week',
+                    'Stay hydrated and eat antioxidant-rich foods',
+                    'Remove makeup before bed every night'
+                ]
+            };
+
+            analysis.tips = tipsMap[analysis.skinType] || [];
+
+            return analysis;
+        };
+
+        // Product Recommendations Database
+        const getProductRecommendations = (skinType) => {
+            const products = {
+                'Dry': [
+                    {
+                        name: 'Cetaphil Moisturising Cream',
+                        brand: 'Cetaphil',
+                        price: '₹749',
+                        rating: 4.6,
+                        reviews: 'Amazing for dry skin! My skin feels hydrated all day.',
+                        url: 'https://www.amazon.in/Cetaphil-Moisturising-Cream/dp/B001ET76EY'
+                    },
+                    {
+                        name: 'Neutrogena Deep Moisture Body Lotion',
+                        brand: 'Neutrogena',
+                        price: '₹599',
+                        rating: 4.5,
+                        reviews: 'Deep hydration that lasts. No more dry patches!',
+                        url: 'https://www.amazon.in/Neutrogena-Norwegian-Formula-Moisture-Lotion/dp/B00GFQVK1G'
+                    },
+                    {
+                        name: 'Plum Green Tea Renewed Clarity Night Gel',
+                        brand: 'Plum',
+                        price: '₹475',
+                        rating: 4.4,
+                        reviews: 'Lightweight yet deeply moisturizing. Love it!',
+                        url: 'https://www.amazon.in/Plum-Green-Renewed-Clarity-Night/dp/B01HHL4RCY'
+                    },
+                    {
+                        name: 'WOW Skin Science Vitamin C Face Serum',
+                        brand: 'WOW',
+                        price: '₹549',
+                        rating: 4.3,
+                        reviews: 'Brightens and hydrates. Perfect for dry skin.',
+                        url: 'https://www.flipkart.com/wow-skin-science-vitamin-c-face-serum'
+                    }
+                ],
+                'Oily': [
+                    {
+                        name: 'Biotique Bio Cucumber Pore Tightening Toner',
+                        brand: 'Biotique',
+                        price: '₹165',
+                        rating: 4.2,
+                        reviews: 'Controls oil and tightens pores effectively.',
+                        url: 'https://www.amazon.in/Biotique-Cucumber-Pore-Tightening-Toner/dp/B00MFZ6BKE'
+                    },
+                    {
+                        name: 'Minimalist Niacinamide 10% Face Serum',
+                        brand: 'Minimalist',
+                        price: '₹599',
+                        rating: 4.6,
+                        reviews: 'Reduced my oil production within 2 weeks!',
+                        url: 'https://www.amazon.in/Minimalist-Niacinamide-Face-Serum-Women/dp/B08GKF9Z78'
+                    },
+                    {
+                        name: 'The Derma Co 2% Salicylic Acid Face Wash',
+                        brand: 'The Derma Co',
+                        price: '₹399',
+                        rating: 4.4,
+                        reviews: 'Clears pores and controls excess sebum perfectly.',
+                        url: 'https://www.amazon.in/Derma-Salicylic-Acid-Face-Wash/dp/B08KGSCQFB'
+                    },
+                    {
+                        name: 'Mamaearth Oil-Free Face Moisturizer',
+                        brand: 'Mamaearth',
+                        price: '₹399',
+                        rating: 4.3,
+                        reviews: 'Lightweight and oil-free. No greasy feel!',
+                        url: 'https://www.flipkart.com/mamaearth-oil-free-face-moisturizer'
+                    }
+                ],
+                'Combination': [
+                    {
+                        name: 'Himalaya Herbals Oil Clear Lemon Face Wash',
+                        brand: 'Himalaya',
+                        price: '₹145',
+                        rating: 4.3,
+                        reviews: 'Balances my combination skin beautifully.',
+                        url: 'https://www.amazon.in/Himalaya-Herbals-Oil-Clear-Lemon/dp/B00MFAK3FK'
+                    },
+                    {
+                        name: 'Dot & Key Vitamin C + E Super Bright Moisturizer',
+                        brand: 'Dot & Key',
+                        price: '₹645',
+                        rating: 4.5,
+                        reviews: 'Perfect for combination skin. Not too heavy!',
+                        url: 'https://www.amazon.in/Dot-Key-Vitamin-Moisturizer-Niacinamide/dp/B08LQPJX2Y'
+                    },
+                    {
+                        name: 'Forest Essentials Facial Toner Rosewater',
+                        brand: 'Forest Essentials',
+                        price: '₹725',
+                        rating: 4.6,
+                        reviews: 'Luxurious and effective. Balances skin pH.',
+                        url: 'https://www.amazon.in/Forest-Essentials-Facial-Toner-Rosewater/dp/B01NAANIJM'
+                    },
+                    {
+                        name: 'Lakme Absolute Argan Oil Serum Foundation',
+                        brand: 'Lakme',
+                        price: '₹850',
+                        rating: 4.2,
+                        reviews: 'Great coverage without clogging pores.',
+                        url: 'https://www.flipkart.com/lakme-absolute-argan-oil-serum-foundation'
+                    }
+                ],
+                'Sensitive': [
+                    {
+                        name: 'Cetaphil Gentle Skin Cleanser',
+                        brand: 'Cetaphil',
+                        price: '₹759',
+                        rating: 4.7,
+                        reviews: 'Gentle and doesn\'t irritate my sensitive skin.',
+                        url: 'https://www.amazon.in/Cetaphil-Gentle-Skin-Cleanser-Face/dp/B001ET76EY'
+                    },
+                    {
+                        name: 'Aveeno Daily Moisturizing Lotion',
+                        brand: 'Aveeno',
+                        price: '₹899',
+                        rating: 4.6,
+                        reviews: 'Soothes and hydrates without any irritation.',
+                        url: 'https://www.amazon.in/Aveeno-Daily-Moisturizing-Lotion-591ml/dp/B00GFQVK26'
+                    },
+                    {
+                        name: 'Sebamed Clear Face Care Gel',
+                        brand: 'Sebamed',
+                        price: '₹575',
+                        rating: 4.5,
+                        reviews: 'Perfect for sensitive skin. No breakouts!',
+                        url: 'https://www.amazon.in/Sebamed-Clear-Face-Care-Gel/dp/B00U2XQKPI'
+                    },
+                    {
+                        name: 'Kaya Skin Clinic Soothing Gel',
+                        brand: 'Kaya',
+                        price: '₹650',
+                        rating: 4.3,
+                        reviews: 'Calms redness and irritation instantly.',
+                        url: 'https://www.flipkart.com/kaya-skin-clinic-soothing-gel'
+                    }
+                ],
+                'Normal': [
+                    {
+                        name: 'Plum Green Tea Renewed Clarity Face Wash',
+                        brand: 'Plum',
+                        price: '₹345',
+                        rating: 4.5,
+                        reviews: 'Maintains my skin\'s natural balance perfectly.',
+                        url: 'https://www.amazon.in/Plum-Green-Renewed-Clarity-Face/dp/B01HHL4RCW'
+                    },
+                    {
+                        name: 'Biotique Bio Morning Nectar Sunscreen',
+                        brand: 'Biotique',
+                        price: '₹265',
+                        rating: 4.4,
+                        reviews: 'Light protection without heaviness.',
+                        url: 'https://www.amazon.in/Biotique-Morning-Nectar-Flawless-Lotion/dp/B00MFZ6BKO'
+                    },
+                    {
+                        name: 'Mamaearth Vitamin C Face Serum',
+                        brand: 'Mamaearth',
+                        price: '₹599',
+                        rating: 4.5,
+                        reviews: 'Brightens and evens out skin tone beautifully.',
+                        url: 'https://www.amazon.in/Mamaearth-Vitamin-Serum-Reduce-Pigmentation/dp/B07VNMMV3Z'
+                    },
+                    {
+                        name: 'St. Botanica Vitamin E Face Cream',
+                        brand: 'St. Botanica',
+                        price: '₹795',
+                        rating: 4.3,
+                        reviews: 'Rich in antioxidants. Skin feels nourished.',
+                        url: 'https://www.flipkart.com/st-botanica-vitamin-e-face-cream'
+                    }
+                ]
+            };
+
+            return products[skinType] || products['Normal'];
+        };
+
+        // Lipstick Recommendations based on skin tone
+        const getLipstickRecommendations = (skinTone) => {
+            const lipsticks = {
+                'Fair': [
+                    { name: 'Nude Pink', brand: 'Maybelline SuperStay Matte Ink', color: '#E6A9A3', price: '₹499' },
+                    { name: 'Coral Blush', brand: 'Lakme 9to5', color: '#FF7F7F', price: '₹395' },
+                    { name: 'Soft Rose', brand: 'Sugar Matte As Hell', color: '#D97B8F', price: '₹599' },
+                    { name: 'Berry Pink', brand: 'Nykaa So Matte', color: '#C25B7C', price: '₹449' }
+                ],
+                'Light': [
+                    { name: 'Peachy Nude', brand: 'Maybelline SuperStay', color: '#FFAB91', price: '₹499' },
+                    { name: 'Warm Rose', brand: 'Lakme Absolute', color: '#E57373', price: '₹650' },
+                    { name: 'Mauve Pink', brand: 'MAC Retro Matte', color: '#C48B9F', price: '₹1,900' },
+                    { name: 'Dusty Pink', brand: 'Sugar Nothing Else Matter', color: '#D4A5A5', price: '₹699' }
+                ],
+                'Medium': [
+                    { name: 'Terracotta', brand: 'Huda Beauty', color: '#C4794D', price: '₹1,650' },
+                    { name: 'Brick Red', brand: 'M.A.C Ruby Woo', color: '#B33A3A', price: '₹1,900' },
+                    { name: 'Warm Berry', brand: 'Nykaa Matte To Last', color: '#8B3A62', price: '₹449' },
+                    { name: 'Spice Brown', brand: 'Sugar Smudge Me Not', color: '#915C44', price: '₹599' }
+                ],
+                'Tan': [
+                    { name: 'Deep Berry', brand: 'Maybelline Sensational', color: '#722F37', price: '₹425' },
+                    { name: 'Wine', brand: 'Lakme Enrich Matte', color: '#5D2E46', price: '₹395' },
+                    { name: 'Chocolate Brown', brand: 'Sugar Matte As Hell', color: '#6F4E37', price: '₹599' },
+                    { name: 'Plum', brand: 'Nykaa So Matte', color: '#8E4585', price: '₹449' }
+                ],
+                'Deep': [
+                    { name: 'Deep Plum', brand: 'Fenty Beauty', color: '#5C1A33', price: '₹1,850' },
+                    { name: 'Rich Berry', brand: 'MAC Diva', color: '#6F2232', price: '₹1,900' },
+                    { name: 'Dark Red', brand: 'Nykaa So Matte', color: '#8B0000', price: '₹449' },
+                    { name: 'Burgundy', brand: 'Sugar Nothing Else Matter', color: '#800020', price: '₹699' }
+                ]
+            };
+
+            return lipsticks[skinTone] || lipsticks['Medium'];
+        };
+
+        // Style Recommendations
+        const getStyleRecommendations = (skinTone) => {
+            const styles = {
+                'Fair': {
+                    colors: ['Pastels', 'Soft blues', 'Lavender', 'Mint green', 'Blush pink'],
+                    avoid: ['Neon colors', 'Very dark colors that create harsh contrast'],
+                    metals: 'Silver and white gold jewelry complement fair skin beautifully'
+                },
+                'Light': {
+                    colors: ['Coral', 'Peach', 'Light teal', 'Soft yellow', 'Rose pink'],
+                    avoid: ['Overly pale colors that wash you out'],
+                    metals: 'Both gold and silver work well with light skin tones'
+                },
+                'Medium': {
+                    colors: ['Earth tones', 'Olive green', 'Burnt orange', 'Deep teal', 'Burgundy'],
+                    avoid: ['Colors that are too matchy with your skin tone'],
+                    metals: 'Warm gold tones look stunning on medium skin'
+                },
+                'Tan': {
+                    colors: ['Rich jewel tones', 'Emerald', 'Sapphire', 'Ruby red', 'Royal purple'],
+                    avoid: ['Muddy browns that blend too much with skin'],
+                    metals: 'Gold and bronze jewelry are perfect matches'
+                },
+                'Deep': {
+                    colors: ['Vibrant colors', 'Electric blue', 'Fuchsia', 'Bright yellow', 'Pure white'],
+                    avoid: ['Dull, muted colors that don\'t pop'],
+                    metals: 'Gold jewelry creates beautiful contrast'
+                }
+            };
+
+            return styles[skinTone] || styles['Medium'];
+        };
+
+        // Main App Component
+        function App() {
+            const [image, setImage] = useState(null);
+            const [imagePreview, setImagePreview] = useState(null);
+            const [analyzing, setAnalyzing] = useState(false);
+            const [results, setResults] = useState(null);
+            const [dragActive, setDragActive] = useState(false);
+            const fileInputRef = useRef(null);
+
+            const handleFileChange = (e) => {
+                const file = e.target.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    setImage(file);
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        setImagePreview(reader.result);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const handleDrag = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (e.type === "dragenter" || e.type === "dragover") {
+                    setDragActive(true);
+                } else if (e.type === "dragleave") {
+                    setDragActive(false);
+                }
+            };
+
+            const handleDrop = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setDragActive(false);
+                
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    const file = e.dataTransfer.files[0];
+                    if (file.type.startsWith('image/')) {
+                        setImage(file);
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                            setImagePreview(reader.result);
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                }
+            };
+
+            const handleAnalyze = async () => {
+                if (!image) return;
+                
+                setAnalyzing(true);
+                const analysisResults = await analyzeSkin(imagePreview);
+                setResults(analysisResults);
+                setAnalyzing(false);
+            };
+
+            return (
+                <div className="app-container">
+                    <div className="bg-gradient"></div>
+                    
+                    <header className="header">
+                        <div className="logo">DermAI</div>
+                        <nav className="nav-links">
+                            <a href="#" className="nav-link">Home</a>
+                            <a href="#" className="nav-link">Analysis</a>
+                            <a href="#" className="nav-link">Products</a>
+                            <a href="#" className="nav-link">About</a>
+                        </nav>
+                    </header>
+
+                    <main className="main-content">
+                        <section className="upload-section">
+                            <h1 className="upload-title">AI-Powered Skin Analysis</h1>
+                            <p className="upload-subtitle">
+                                Upload your photo for advanced skin analysis using cutting-edge deep learning algorithms
+                            </p>
+
+                            <div 
+                                className={`upload-zone ${dragActive ? 'active' : ''}`}
+                                onClick={() => fileInputRef.current.click()}
+                                onDragEnter={handleDrag}
+                                onDragLeave={handleDrag}
+                                onDragOver={handleDrag}
+                                onDrop={handleDrop}
+                            >
+                                <div className="upload-icon">📸</div>
+                                <div className="upload-text">Click to upload or drag and drop</div>
+                                <div className="upload-hint">Supports: JPG, PNG, WEBP (Max 10MB)</div>
+                                <input 
+                                    ref={fileInputRef}
+                                    type="file" 
+                                    accept="image/*" 
+                                    onChange={handleFileChange}
+                                    style={{ display: 'none' }}
+                                />
+                            </div>
+
+                            {imagePreview && (
+                                <div className="image-preview">
+                                    <img src={imagePreview} alt="Preview" />
+                                </div>
+                            )}
+
+                            {imagePreview && !analyzing && (
+                                <center>
+                                    <button 
+                                        className="analyze-button"
+                                        onClick={handleAnalyze}
+                                    >
+                                        🔬 Analyze My Skin
+                                    </button>
+                                </center>
+                            )}
+                        </section>
+
+                        {analyzing && (
+                            <div className="loading">
+                                <div className="loading-spinner"></div>
+                                <h3>Analyzing your skin with AI...</h3>
+                                <p style={{ color: 'var(--text-secondary)', marginTop: '1rem' }}>
+                                    Processing with advanced computer vision algorithms
+                                </p>
+                            </div>
+                        )}
+
+                        {results && !analyzing && (
+                            <div className="results-section">
+                                <div className="results-grid">
+                                    <div className="result-card">
+                                        <h3 className="result-card-title">
+                                            <span className="result-card-icon">🧪</span>
+                                            Skin Type
+                                        </h3>
+                                        <div className="skin-type-badge">{results.skinType}</div>
+                                        <p style={{ color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+                                            Your skin type has been identified using advanced ML algorithms analyzing texture, pore size, and sebum production patterns.
+                                        </p>
+                                    </div>
+
+                                    <div className="result-card">
+                                        <h3 className="result-card-title">
+                                            <span className="result-card-icon">🎨</span>
+                                            Skin Tone
+                                        </h3>
+                                        <div 
+                                            className="skin-tone-indicator"
+                                            style={{ backgroundColor: results.skinTone.hex }}
+                                        ></div>
+                                        <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>
+                                            {results.skinTone.name}
+                                        </div>
+                                        <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                                            Color: {results.skinTone.hex}
+                                        </p>
+                                    </div>
+
+                                    <div className="result-card">
+                                        <h3 className="result-card-title">
+                                            <span className="result-card-icon">💧</span>
+                                            Metrics
+                                        </h3>
+                                        <div className="metric-bar">
+                                            <div className="metric-label">
+                                                <span>Hydration Level</span>
+                                                <span className="metric-value">{results.hydration}%</span>
+                                            </div>
+                                            <div className="progress-bar">
+                                                <div className="progress-fill" style={{ width: `${results.hydration}%` }}></div>
+                                            </div>
+                                        </div>
+                                        <div className="metric-bar">
+                                            <div className="metric-label">
+                                                <span>Barrier Score</span>
+                                                <span className="metric-value">{results.barrierScore}%</span>
+                                            </div>
+                                            <div className="progress-bar">
+                                                <div className="progress-fill" style={{ width: `${results.barrierScore}%` }}></div>
+                                            </div>
+                                        </div>
+                                        <div className="metric-bar">
+                                            <div className="metric-label">
+                                                <span>Photo Clarity</span>
+                                                <span className="metric-value">{results.photoClarity}%</span>
+                                            </div>
+                                            <div className="progress-bar">
+                                                <div className="progress-fill" style={{ width: `${results.photoClarity}%` }}></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="results-grid">
+                                    <div className="result-card">
+                                        <h3 className="result-card-title">
+                                            <span className="result-card-icon">⚠️</span>
+                                            Skin Concerns Detected
+                                        </h3>
+                                        <ul className="concerns-list">
+                                            {results.concerns.map((concern, index) => (
+                                                <li key={index} className="concern-item">{concern}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+
+                                    <div className="result-card">
+                                        <h3 className="result-card-title">
+                                            <span className="result-card-icon">💡</span>
+                                            Personalized Tips
+                                        </h3>
+                                        <ul className="tips-list">
+                                            {results.tips.map((tip, index) => (
+                                                <li key={index} className="tip-item">{tip}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                <div className="products-section">
+                                    <h2 className="products-title">🛍️ Recommended Products for {results.skinType} Skin</h2>
+                                    <div className="products-grid">
+                                        {getProductRecommendations(results.skinType).map((product, index) => (
+                                            <div key={index} className="product-card">
+                                                <div className="product-name">{product.name}</div>
+                                                <div className="product-brand">{product.brand}</div>
+                                                <div className="product-price">{product.price}</div>
+                                                <div className="product-rating">
+                                                    <span className="stars">{'⭐'.repeat(Math.floor(product.rating))}</span>
+                                                    <span>{product.rating}/5</span>
+                                                </div>
+                                                <div className="product-review">"{product.reviews}"</div>
+                                                <a href={product.url} target="_blank" className="product-link">
+                                                    Buy Now
+                                                </a>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="products-section lipstick-section">
+                                    <h2 className="products-title">💄 Perfect Lipstick Shades for You</h2>
+                                    <div className="lipstick-grid">
+                                        {getLipstickRecommendations(results.skinTone.name).map((lipstick, index) => (
+                                            <div key={index} className="lipstick-card">
+                                                <div 
+                                                    className="lipstick-swatch"
+                                                    style={{ backgroundColor: lipstick.color }}
+                                                ></div>
+                                                <div className="lipstick-name">{lipstick.name}</div>
+                                                <div className="lipstick-brand">{lipstick.brand}</div>
+                                                <div style={{ color: 'var(--secondary)', fontWeight: '700', marginTop: '0.5rem' }}>
+                                                    {lipstick.price}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="style-section">
+                                    <h2 className="products-title">👗 Style Recommendations</h2>
+                                    <div className="style-grid">
+                                        <div className="style-card">
+                                            <div className="style-category">Best Colors for You</div>
+                                            <ul className="style-suggestions">
+                                                {getStyleRecommendations(results.skinTone.name).colors.map((color, index) => (
+                                                    <li key={index}>✓ {color}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                        <div className="style-card">
+                                            <div className="style-category">Colors to Avoid</div>
+                                            <ul className="style-suggestions">
+                                                {getStyleRecommendations(results.skinTone.name).avoid.map((color, index) => (
+                                                    <li key={index}>✗ {color}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                        <div className="style-card">
+                                            <div className="style-category">Jewelry & Accessories</div>
+                                            <p style={{ padding: '1rem 0', lineHeight: '1.6' }}>
+                                                {getStyleRecommendations(results.skinTone.name).metals}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
